@@ -4,7 +4,7 @@
   to get a working mdl project (for now).
 
   my_main.c will serve as the interpreter for mdl.
-  When an mdl script goes through a lexer and parser, 
+  When an mdl script goes through a lexer and parser,
   the resulting operations will be in the array op[].
 
   Your job is to go through each entry in op and perform
@@ -13,25 +13,25 @@
   push: push a new origin matrix onto the origin stack
   pop: remove the top matrix on the origin stack
 
-  move/scale/rotate: create a transformation matrix 
-                     based on the provided values, then 
+  move/scale/rotate: create a transformation matrix
+                     based on the provided values, then
 		     multiply the current top of the
 		     origins stack by it.
 
   box/sphere/torus: create a solid object based on the
-                    provided values. Store that in a 
+                    provided values. Store that in a
 		    temporary matrix, multiply it by the
 		    current top of the origins stack, then
 		    call draw_polygons.
 
-  line: create a line based on the provided values. Store 
+  line: create a line based on the provided values. Store
         that in a temporary matrix, multiply it by the
 	current top of the origins stack, then call draw_lines.
 
   save: call save_extension with the provided filename
 
   display: view the image live
-  
+
   jdyrlandweaver
   =========================*/
 
@@ -50,13 +50,13 @@
 #include "stack.h"
 
 /*======== void first_pass() ==========
-  Inputs:   
-  Returns: 
+  Inputs:
+  Returns:
 
   Checks the op array for any animation commands
   (frames, basename, vary)
-  
-  Should set num_frames and basename if the frames 
+
+  Should set num_frames and basename if the frames
   or basename commands are present
 
   If vary is found, but frames is not, the entire
@@ -72,17 +72,49 @@ void first_pass() {
   //in order to use name and num_frames
   //they must be extern variables
   extern int num_frames;
-  extern char name[128]; 
+  extern char name[128];
+  char vary_found = 0;
+  char frames_found = 0;
+  char base_found = 0;
+
+  for (i=0; i<lastop; i++){
+    printf("%d:", i);
+      switch(op[i].opcode){
+        case BASENAME:
+          base_found = 1;
+          strcpy(name, op[i].op.basename.p->name);
+          break;
+
+        case VARY:
+          vary_found = 1;
+          break;
+
+        case FRAMES:
+          frames_found = 1;
+          num_frames = op[i].op.frames.num_frames;
+          break;
+      }
+      if (vary_found && (!frames_found)){
+        printf("vary found but frames not found\n");
+        exit(0);
+      }
+      if (frames_found && (!base_found)){
+        printf("basename not found, set to default value (img)\n");
+        strcpy(name, "img");
+      }
+  }
+
+
 
   return;
 }
 
 /*======== struct vary_node ** second_pass() ==========
-  Inputs:   
+  Inputs:    DontAskValeriy
   Returns: An array of vary_node linked lists
 
   In order to set the knobs for animation, we need to keep
-  a seaprate value for each knob for each frame. We can do
+  a seperate value for each knob for each frame. We can do
   this by using an array of linked lists. Each array index
   will correspond to a frame (eg. knobs[0] would be the first
   frame, knobs[2] would be the 3rd frame and so on).
@@ -91,21 +123,45 @@ void first_pass() {
   node contains a knob name, a value, and a pointer to the
   next node.
 
-  Go through the opcode array, and when you find vary, go 
+  Go through the opcode array, and when you find vary, go
   from knobs[0] to knobs[frames-1] and add (or modify) the
   vary_node corresponding to the given knob with the
-  appropirate value. 
+  appropirate value.
 
   jdyrlandweaver
   ====================*/
 struct vary_node ** second_pass() {
-  return NULL;
+  struct vary_node ** knobs = calloc(MAX_SYMBOLS, sizeof(struct vary_node *));
+  int i;
+  int x;
+  for (i=0; i<num_frames; i++){
+    knobs[i]->next = NULL;
+    for (x = 0; x<lastop; x++){
+      switch(op[i].opcode){
+        struct vary_node * curr = knobs[i];
+        case VARY:
+          while(curr->next != NULL){
+            curr = curr->next;
+          }
+          strcpy(curr->name, op[i].op.vary.p->name);
+          double progress = (op[i].op.vary.end_val - op[i].op.vary.start_val) /
+                            (op[i].op.vary.end_frame - op[i].op.vary.start_frame) * i;
+          curr->value = op[i].op.vary.start_val + progress;
+          struct vary_node * next_node; //Perhaps allocate memory?
+          curr->next = next_node;
+          next_node->next = NULL;
+          break;
+      }
+    }
+
+  }
+  return vary_node;
 }
 
 
 /*======== void print_knobs() ==========
-Inputs:   
-Returns: 
+Inputs:
+Returns:
 
 Goes through symtab and display all the knobs and their
 currnt values
@@ -113,7 +169,7 @@ currnt values
 jdyrlandweaver
 ====================*/
 void print_knobs() {
-  
+
   int i;
 
   printf( "ID\tNAME\t\tTYPE\t\tVALUE\n" );
@@ -130,27 +186,27 @@ void print_knobs() {
 
 
 /*======== void my_main() ==========
-  Inputs: 
-  Returns: 
+  Inputs:
+  Returns:
 
   This is the main engine of the interpreter, it should
   handle most of the commadns in mdl.
 
-  If frames is not present in the source (and therefore 
+  If frames is not present in the source (and therefore
   num_frames is 1, then process_knobs should be called.
 
-  If frames is present, the enitre op array must be
+  If frames is present, the entire op array must be
   applied frames time. At the end of each frame iteration
   save the current screen to a file named the
   provided basename plus a numeric string such that the
   files will be listed in order, then clear the screen and
   reset any other data structures that need it.
 
-  Important note: you cannot just name your files in 
+  Important note: you cannot just name your files in
   regular sequence, like pic0, pic1, pic2, pic3... if that
   is done, then pic1, pic10, pic11... will come before pic2
   and so on. In order to keep things clear, add leading 0s
-  to the numeric portion of the name. If you use sprintf, 
+  to the numeric portion of the name. If you use sprintf,
   you can use "%0xd" for this purpose. It will add at most
   x 0s in front of a number, if needed, so if used correctly,
   and x = 4, you would get numbers like 0001, 0002, 0011,
@@ -167,7 +223,7 @@ void my_main() {
   color g;
   double step = 0.1;
   double theta;
-  
+
   systems = new_stack();
   tmp = new_matrix(4, 1000);
   clear_screen( t );
@@ -221,7 +277,7 @@ void my_main() {
 		    op[i].op.torus.r0,op[i].op.torus.r1, step);
 	  matrix_mult( peek(systems), tmp );
 	  draw_polygons(tmp, t, g);
-	  tmp->lastcol = 0;	  
+	  tmp->lastcol = 0;
 	  break;
 	case BOX:
 	  printf("Box: d0: %6.2f %6.2f %6.2f d1: %6.2f %6.2f %6.2f",
@@ -310,7 +366,7 @@ void my_main() {
 	    tmp = make_rotY( theta );
 	  else
 	    tmp = make_rotZ( theta );
-	  
+
 	  matrix_mult(peek(systems), tmp);
 	  copy_matrix(tmp, peek(systems));
 	  tmp->lastcol = 0;

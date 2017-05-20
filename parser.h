@@ -70,7 +70,7 @@ struct command
     struct {
       SYMTAB *constants;
       char name[255];
-      SYMTAB *cs; 
+      SYMTAB *cs;
     } mesh;
     struct {
       SYMTAB *p;
@@ -116,7 +116,7 @@ struct command
     struct {
       double value;
     } setknobs;
-    struct { 
+    struct {
       double value;
     } focal;
   } op;
@@ -131,22 +131,17 @@ int num_frames;
 char name[128];
 
 struct vary_node {
-  
+
   char name[128];
   double value;
   struct vary_node *next;
 };
 
 void print_knobs();
-void process_knobs();
+void process_knobs(int frame, struct vary_node ** knobs);
 void first_pass();
 struct vary_node ** second_pass();
 
 void print_pcode();
 void my_main();
 #endif
-
-
-
-
-
